@@ -12,11 +12,11 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
-	"regexp"
 	"strings"
 	"text/template"
 
 	"golang.org/x/tools/go/packages"
+	"gorm.io/gorm/schema"
 )
 
 var (
@@ -42,23 +42,12 @@ func isDir(name string) bool {
 	return info.IsDir()
 }
 
-var camel = regexp.MustCompile("(^[^A-Z]*|[A-Z]*)([A-Z][^A-Z]+|$)")
-
-func underscore(s string) string {
-	var a []string
-	for _, sub := range camel.FindAllStringSubmatch(s, -1) {
-		if sub[1] != "" {
-			a = append(a, sub[1])
-		}
-		if sub[2] != "" {
-			a = append(a, sub[2])
-		}
-	}
-	return strings.ToLower(strings.Join(a, "_"))
-}
+var namer = schema.NamingStrategy{}
 
 var funcMap template.FuncMap = template.FuncMap{
-	"underscore": underscore,
+	"tablename": func(name string) string {
+		return namer.TableName(name)
+	},
 }
 
 func main() {

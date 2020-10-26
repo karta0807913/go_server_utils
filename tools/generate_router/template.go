@@ -8,7 +8,7 @@ import (
 const CreateOrUpdateTemplate = `
 package {{ .Package }}
 
-{{ $StructName := (print .StructName "s") }}
+{{ $TableName := (tablename .StructName) }}
 
 // this file generate by go generate, please don't edit it
 // data will put into struct
@@ -59,14 +59,14 @@ func (insert *{{ .StructName }}){{ .FuncName }}(c *gin.Context, db *gorm.DB) err
     {{/* create or update */}}
     return db.Select(
     selectField[0], selectField[1:],
-    ){{ with .IndexField }}.Where("{{ underscore $StructName }}.{{ .Column }}=?", body.{{.Name}}){{ end }}.{{ .Mode }}(&insert).Error
+    ){{ with .IndexField }}.Where("{{ $TableName }}.{{ .Column }}=?", body.{{.Name}}){{ end }}.{{ .Mode }}(&insert).Error
 }
 `
 
 const FirstTemplate = `
 package {{ .Package }}
 
-{{ $StructName := (print .StructName "s") }}
+{{ $TableName := (tablename .StructName) }}
 
 // this file generate by go generate, please don't edit it
 // search options will put into struct
@@ -86,7 +86,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
     {{/* if decode success, search the specific data */}}
     {{ if ne (len .RequiredFields) 0}}
       whereField := []string {
-        {{ range .RequiredFields }}"{{ underscore $StructName }}.{{ .Column }}=?",
+        {{ range .RequiredFields }}"{{ $TableName }}.{{ .Column }}=?",
         {{ end }}
       }
       valueField := []interface{}{
@@ -104,7 +104,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
     {{/* put options */}}
     {{ range .OptionalFields }}
       if body.{{ .Name }} != nil {
-        whereField = append(whereField, "{{ underscore $StructName }}.{{ .Column }}=?")
+        whereField = append(whereField, "{{ $TableName }}.{{ .Column }}=?")
         valueField = append(valueField, body.{{ .Name }})
         item.{{ .Name }} = *body.{{ .Name }}
       }
@@ -118,8 +118,8 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
 
     {{/* return item */}}
     err = db.Where(
-      strings.Join(whereField, "and"),
-      valueField,
+      strings.Join(whereField, " and "),
+      valueField[0], valueField[1:],
     ).First(item).Error
     return err
 }`
@@ -127,7 +127,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
 const FindTemplate = `
 package {{ .Package }}
 
-{{ $StructName := (print .StructName "s") }}
+{{ $TableName := (tablename .StructName) }}
 
 // this file generate by go generate, please don't edit it
 // search options will put into struct
@@ -144,7 +144,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) ([]{
     {{/* if decode success, search the specific data */}}
     {{ if ne (len .RequiredFields) 0}}
       whereField := []string {
-        {{ range .RequiredFields }}"{{ underscore $StructName }}.{{ .Column }}=?",
+        {{ range .RequiredFields }}"{{ $TableName }}.{{ .Column }}=?",
         {{ end }}
       }
       valueField := []interface{}{
@@ -161,7 +161,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) ([]{
     {{/* put options */}}
     {{ range .OptionalFields }}
       if body.{{ .Name }} != nil {
-        whereField = append(whereField, "{{ underscore $StructName }}.{{ .Column }}=?")
+        whereField = append(whereField, "{{ $TableName }}.{{ .Column }}=?")
         valueField = append(valueField, body.{{ .Name }})
         item.{{ .Name }} = *body.{{ .Name }}
       }
@@ -181,17 +181,22 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) ([]{
        }
     }
     soffset, ok := c.GetQuery("offset")
-    offset, err := strconv.Atoi(soffset)
-    if err != nil {
-      offset = 0
-    } else if offset < 0 {
-      offset = 0
-    }
+	var offset int
+    if ok {
+		offset, err = strconv.Atoi(soffset)
+		if err != nil {
+			offset = 0
+		} else if offset < 0 {
+			offset = 0
+		}
+	} else {
+		offset = 0
+	}
     var result []{{ .StructName }}
     if len(whereField) != 0 {
 	  db = db.Where(
-        strings.Join(whereField, "and"),
-        valueField,
+        strings.Join(whereField, " and "),
+        valueField[0], valueField[1:],
       )
     }
 	err = db.Limit(limit).Offset(offset).Find(&result).Error
@@ -223,7 +228,7 @@ type TemplateField struct {
 	Column string
 }
 
-func parseFields(field Field, tagKey string, encodeKey string) (TemplateField, []string, uint8) {
+func parseFields(root TemplateRoot, field Field, tagKey string, encodeKey string) (TemplateField, []string, uint8) {
 	tf := TemplateField{
 		Name: field.Name,
 		Type: field.Type,
@@ -237,7 +242,7 @@ func parseFields(field Field, tagKey string, encodeKey string) (TemplateField, [
 	if ok {
 		tf.Column = column
 	} else {
-		tf.Column = underscore(field.Name)
+		tf.Column = namer.ColumnName(root.StructName, field.Name)
 	}
 	gormTag, ok := field.Tag.Lookup("gorm")
 	//     16       8      4      2        1

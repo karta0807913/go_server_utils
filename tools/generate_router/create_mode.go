@@ -27,7 +27,7 @@ func MethodCreate(arg MethodCreateParams) *TemplateRoot {
 	}
 
 	for _, field := range arg.ParsedType.Fields {
-		tf, tags, join := parseFields(field, arg.TagKey, arg.TagKey)
+		tf, tags, join := parseFields(templateRoot, field, arg.TagKey, arg.TagKey)
 		// if this field is required
 		if arg.IgnoreSet.CheckAndDelete(field.Name) {
 			continue

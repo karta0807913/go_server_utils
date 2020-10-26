@@ -38,7 +38,7 @@ func MethodSearch(arg MethodSearchParams) *SearchTemplateRoot {
 	}
 
 	for _, field := range arg.ParsedType.Fields {
-		tf, tags, flag := parseFields(field, arg.TagKey, "form")
+		tf, tags, flag := parseFields(templateRoot.TemplateRoot, field, arg.TagKey, "form")
 
 		// if this field is required
 		if arg.IgnoreSet.CheckAndDelete(field.Name) {

@@ -27,7 +27,7 @@ func MethodUpdate(arg MethodUpdateParams) *TemplateRoot {
 	var indexFlag uint8 = 0
 	var indexTags []string = make([]string, 0)
 	for _, field := range arg.ParsedType.Fields {
-		tf, tags, flag := parseFields(field, arg.TagKey, arg.TagKey)
+		tf, tags, flag := parseFields(templateRoot, field, arg.TagKey, arg.TagKey)
 
 		// if this field is required
 		if arg.IndexField == field.Name {
