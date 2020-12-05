@@ -13,6 +13,7 @@ type MethodCreateParams struct {
 	OptionsSet *CommaSet
 	IgnoreSet  *CommaSet
 	TagKey     string
+	MinItem    uint
 }
 
 // Create *TemplateRoot and update *Document
@@ -24,6 +25,7 @@ func MethodCreate(arg MethodCreateParams) *TemplateRoot {
 		RequiredFields: make([]TemplateField, 0),
 		OptionalFields: make([]TemplateField, 0),
 		Mode:           "Create",
+		MinItem:        arg.MinItem,
 	}
 
 	for _, field := range arg.ParsedType.Fields {
@@ -39,6 +41,7 @@ func MethodCreate(arg MethodCreateParams) *TemplateRoot {
 			tf.Tag = "`" + strings.Join(tags, " ") + "`"
 			templateRoot.OptionalFields = append(templateRoot.OptionalFields, tf)
 		} else {
+			// if is primary key, pass
 			if join >= 16 {
 				continue
 			}

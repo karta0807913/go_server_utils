@@ -22,8 +22,8 @@ import (
 var (
 	typeName   = flag.String("type", "", "type name; must be set")
 	method     = flag.String("method", "Find", "Create, Update, Find, First")
-	prefix     = flag.String("prefix", "", "http route prefix")
 	required   = flag.String("require", "", "input required fields, default read gorm tag in struct which is not null without primaryKey and default")
+	minItem    = flag.Uint("minItem", 1, "minimum number of items to choose")
 	options    = flag.String("options", "", "input options fields")
 	decoder    = flag.String("decoder", "json", "decoder: xml,json or etc")
 	ignore     = flag.String("ignore", "", "which field should ignore")
@@ -47,6 +47,20 @@ var namer = schema.NamingStrategy{}
 var funcMap template.FuncMap = template.FuncMap{
 	"tablename": func(name string) string {
 		return namer.TableName(name)
+	}, "to_pointer_type": func(field TemplateField) string {
+		if field.StarExpr {
+			return field.Type
+		} else {
+			return "*" + field.Type
+		}
+	}, "remove_pointer_type": func(field TemplateField) string {
+		if field.StarExpr {
+			return field.Type[1:]
+		} else {
+			return field.Type
+		}
+	}, "pluses": func(a, b int) interface{} {
+		return a + b
 	},
 }
 
@@ -104,6 +118,7 @@ func main() {
 			OptionsSet: optionsSet,
 			IgnoreSet:  ignoreSet,
 			TagKey:     *decoder,
+			MinItem:    *minItem,
 		})
 		temp.Package = parsedPKG.Name
 		t := template.New("").Funcs(funcMap)
@@ -117,6 +132,7 @@ func main() {
 			IgnoreSet:  ignoreSet,
 			IndexField: *indexField,
 			TagKey:     *decoder,
+			MinItem:    *minItem,
 		})
 		temp.Package = parsedPKG.Name
 		t := template.New("").Funcs(funcMap)
@@ -184,10 +200,34 @@ type Type struct {
 }
 
 type Field struct {
-	Name string
-	Tag  reflect.StructTag
-	Doc  *ast.CommentGroup
-	Type string
+	Name     string
+	RawField ast.Expr
+	Tag      reflect.StructTag
+	Doc      *ast.CommentGroup
+	Type     string
+}
+
+func getExprName(expr ast.Expr) string {
+	var typeStr string
+	switch t := expr.(type) {
+	case *ast.Ident:
+		typeStr = t.Name
+	case *ast.SelectorExpr:
+		typeStr = t.X.(*ast.Ident).Name + "." + t.Sel.Name
+	case *ast.ArrayType:
+		var prefix string
+		if t.Len == nil {
+			prefix = ""
+		} else {
+			prefix = t.Len.(*ast.BasicLit).Value
+		}
+		typeStr = "[" + prefix + "]" + getExprName(t.Elt)
+	case *ast.StarExpr:
+		typeStr = "*" + getExprName(t.X)
+	default:
+		panic("type not support")
+	}
+	return typeStr
 }
 
 func parsePackage(structname []string) *Package {
@@ -229,20 +269,19 @@ func parsePackage(structname []string) *Package {
 					Fields: make([]Field, 0),
 				}
 				for _, field := range structType.Fields.List {
-					tags := reflect.StructTag(strings.ReplaceAll(field.Tag.Value, "`", ""))
-					var typeStr string
-					switch t := field.Type.(type) {
-					case *ast.Ident:
-						typeStr = t.Name
-					case *ast.SelectorExpr:
-						typeStr = t.X.(*ast.Ident).Name + "." + t.Sel.Name
+					if field.Tag == nil {
+						field.Tag = new(ast.BasicLit)
 					}
+					tags := reflect.StructTag(strings.ReplaceAll(field.Tag.Value, "`", ""))
+
+					typeStr := getExprName(field.Type)
 					for _, name := range field.Names {
 						t.Fields = append(t.Fields, Field{
-							Name: name.Name,
-							Tag:  tags,
-							Doc:  field.Doc,
-							Type: typeStr,
+							Name:     name.Name,
+							RawField: field.Type,
+							Tag:      tags,
+							Doc:      field.Doc,
+							Type:     typeStr,
 						})
 					}
 				}

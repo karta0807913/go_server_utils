@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"go/ast"
 	"strings"
 )
 
@@ -15,9 +16,9 @@ package {{ .Package }}
 func (insert *{{ .StructName }}){{ .FuncName }}(c *gin.Context, db *gorm.DB) error {
     type Body struct {
       {{ with .IndexField }}{{ .Name }} {{ .Type }} {{ .Tag }} {{ end }}
-      {{ range .RequiredFields }}{{ .Name }}  {{ .Type}} {{ .Tag }}
+      {{ range .RequiredFields }}{{ .Name }}  {{ remove_pointer_type . }} {{ .Tag }}
       {{ end }}
-      {{ range .OptionalFields }}{{ .Name }} *{{ .Type}} {{ .Tag }}
+      {{ range .OptionalFields }}{{ .Name }} {{ to_pointer_type . }} {{ .Tag }}
       {{ end }}
     }
     var body Body;
@@ -28,7 +29,7 @@ func (insert *{{ .StructName }}){{ .FuncName }}(c *gin.Context, db *gorm.DB) err
     {{ with .IndexField }}insert.{{ .Name }} = body.{{ .Name }}{{ end }}
 
     {{/* select array */}}
-    {{ if ne (len .RequiredFields) 0}}
+    {{ if ne (len .RequiredFields) 0 }}
       selectField := []string {
         {{ range .RequiredFields }}"{{ .Column }}",
         {{ end }}
@@ -41,19 +42,21 @@ func (insert *{{ .StructName }}){{ .FuncName }}(c *gin.Context, db *gorm.DB) err
     {{ range .OptionalFields }}
       if body.{{ .Name }} != nil {
         selectField = append(selectField, "{{ .Column }}")
-        insert.{{ .Name }} = *body.{{ .Name }}
+        insert.{{ .Name }} = {{ if .StarExpr }}{{ else }}*{{ end }}body.{{ .Name }}
       }
     {{ end }}
 
     {{/* check options */}}
-    {{ if ne (len .OptionalFields) 0}}
-      if len(selectField) == {{ len .RequiredFields }} {
-        return errors.New("rqeuire at least one option")
-      }
+    {{ if ne .MinItem 0 }}
+      {{ if ne (len .OptionalFields) 0}}
+        if len(selectField) == {{ len .RequiredFields }} {
+          return errors.New("require at least one option")
+        }
+      {{ end }}
     {{ end }}
 
 
-    {{ range .RequiredFields }}insert.{{ .Name }} = body.{{ .Name }}
+    {{ range .RequiredFields }}insert.{{ .Name }} = {{ if .StarExpr }}&{{ else }}{{ end }}body.{{ .Name }}
     {{ end }}
 
     {{/* create or update */}}
@@ -139,7 +142,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) ([]{
       {{ end }}
     }
     var body Body;
-    err := c.{{ .Decoder }}(&body)
+    _ := c.{{ .Decoder }}(&body)
 
     {{/* if decode success, search the specific data */}}
     {{ if ne (len .RequiredFields) 0}}
@@ -213,6 +216,7 @@ type TemplateRoot struct {
 	IndexField     *TemplateField
 	RequiredFields []TemplateField
 	OptionalFields []TemplateField
+	MinItem        uint // for create and update
 }
 
 type SearchTemplateRoot struct {
@@ -222,10 +226,11 @@ type SearchTemplateRoot struct {
 }
 
 type TemplateField struct {
-	Name   string
-	Type   string
-	Tag    string
-	Column string
+	Name     string
+	Type     string
+	Tag      string
+	Column   string
+	StarExpr bool
 }
 
 func parseFields(root TemplateRoot, field Field, tagKey string, encodeKey string) (TemplateField, []string, uint8) {
@@ -244,6 +249,9 @@ func parseFields(root TemplateRoot, field Field, tagKey string, encodeKey string
 	} else {
 		tf.Column = namer.ColumnName(root.StructName, field.Name)
 	}
+
+	_, tf.StarExpr = field.RawField.(*ast.StarExpr)
+
 	gormTag, ok := field.Tag.Lookup("gorm")
 	//     16       8      4      2        1
 	// primaryKey unique index not_null default
@@ -251,16 +259,16 @@ func parseFields(root TemplateRoot, field Field, tagKey string, encodeKey string
 	var flag uint8 = 0
 	if ok {
 		opt := gormTag
-		if strings.Index(opt, "not null") != -1 {
+		if strings.Contains(opt, "not null") {
 			flag |= 2
 		}
-		if strings.Index(opt, "primaryKey") != -1 {
+		if strings.Contains(opt, "primaryKey") {
 			flag |= 16
 		}
-		if strings.Index(opt, "index") != -1 {
+		if strings.Contains(opt, "index") {
 			flag |= 4
 		}
-		if strings.Index(opt, "unique") != -1 {
+		if strings.Contains(opt, "unique") {
 			flag |= 8
 		}
 	}

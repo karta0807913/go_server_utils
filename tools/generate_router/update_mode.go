@@ -12,6 +12,7 @@ type MethodUpdateParams struct {
 	IgnoreSet  *CommaSet
 	IndexField string
 	TagKey     string
+	MinItem    uint
 }
 
 func MethodUpdate(arg MethodUpdateParams) *TemplateRoot {
@@ -22,6 +23,7 @@ func MethodUpdate(arg MethodUpdateParams) *TemplateRoot {
 		RequiredFields: make([]TemplateField, 0),
 		OptionalFields: make([]TemplateField, 0),
 		Mode:           "Updates",
+		MinItem:        arg.MinItem,
 	}
 
 	var indexFlag uint8 = 0
