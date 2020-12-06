@@ -34,7 +34,7 @@ func main() {
 		os.Exit(127)
 	}
 
-	t := template.New(flag.Arg(0))
+	t := template.New(filepath.Base(flag.Arg(0)))
 	if _, err := os.Stat(*extraTemplate); !os.IsNotExist(err) {
 		err := filepath.Walk(*extraTemplate, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -88,6 +88,7 @@ func main() {
 type Document struct {
 	Path    string
 	Comment string
+	Mode    string
 	Fields  []Field
 }
 

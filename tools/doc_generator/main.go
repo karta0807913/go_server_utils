@@ -31,6 +31,9 @@ func main() {
 		}
 		fileNameList = append(fileNameList, subList[1])
 	}
+	if len(fileNameList) == 0 {
+		log.Fatalln("can't find any match file")
+	}
 	outputFile, err := os.OpenFile("main.go", os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatalf("generate main.go get error %s", err)

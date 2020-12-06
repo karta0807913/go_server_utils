@@ -22,6 +22,7 @@ func MethodSearch(arg MethodSearchParams) *SearchTemplateRoot {
 			Decoder:        "ShouldBindQuery",
 			RequiredFields: make([]TemplateField, 0),
 			OptionalFields: make([]TemplateField, 0),
+			Mode:           "Search",
 		},
 	}
 
