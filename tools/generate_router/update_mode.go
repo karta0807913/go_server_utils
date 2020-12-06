@@ -12,24 +12,25 @@ type MethodUpdateParams struct {
 	IgnoreSet  *CommaSet
 	IndexField string
 	TagKey     string
-	MinItem    uint
 }
 
-func MethodUpdate(arg MethodUpdateParams) *TemplateRoot {
-	templateRoot := TemplateRoot{
-		FuncName:       *method,
-		StructName:     arg.ParsedType.Name,
-		Decoder:        "ShouldBind" + strings.ToUpper(arg.TagKey),
-		RequiredFields: make([]TemplateField, 0),
-		OptionalFields: make([]TemplateField, 0),
-		Mode:           "Updates",
-		MinItem:        arg.MinItem,
+func MethodUpdate(arg MethodUpdateParams) *CreateAndUpdateTemplateRoot {
+	templateRoot := CreateAndUpdateTemplateRoot{
+		TemplateRoot: TemplateRoot{
+			FuncName:       *method,
+			StructName:     arg.ParsedType.Name,
+			Decoder:        "ShouldBind" + strings.ToUpper(arg.TagKey),
+			RequiredFields: make([]TemplateField, 0),
+			OptionalFields: make([]TemplateField, 0),
+			Mode:           "Updates",
+		},
+		MinItem: *minItem,
 	}
 
 	var indexFlag uint8 = 0
 	var indexTags []string = make([]string, 0)
 	for _, field := range arg.ParsedType.Fields {
-		tf, tags, flag := parseFields(templateRoot, field, arg.TagKey, arg.TagKey)
+		tf, tags, flag := parseFields(templateRoot.TemplateRoot, field, arg.TagKey, arg.TagKey)
 
 		// if this field is required
 		if arg.IndexField == field.Name {

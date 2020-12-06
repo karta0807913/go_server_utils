@@ -142,7 +142,8 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) ([]{
       {{ end }}
     }
     var body Body;
-    _ := c.{{ .Decoder }}(&body)
+    var err error;
+    _ = c.{{ .Decoder }}(&body)
 
     {{/* if decode success, search the specific data */}}
     {{ if ne (len .RequiredFields) 0}}
@@ -213,10 +214,8 @@ type TemplateRoot struct {
 	StructName     string
 	Decoder        string
 	Mode           string
-	IndexField     *TemplateField
 	RequiredFields []TemplateField
 	OptionalFields []TemplateField
-	MinItem        uint // for create and update
 }
 
 type SearchTemplateRoot struct {
@@ -225,11 +224,19 @@ type SearchTemplateRoot struct {
 	MinLimit uint
 }
 
+type CreateAndUpdateTemplateRoot struct {
+	TemplateRoot
+	IndexField *TemplateField
+	MinItem    uint
+}
+
 type TemplateField struct {
 	Name     string
 	Type     string
 	Tag      string
+	Doc      string
 	Column   string
+	Alias    string
 	StarExpr bool
 }
 
@@ -238,10 +245,17 @@ func parseFields(root TemplateRoot, field Field, tagKey string, encodeKey string
 		Name: field.Name,
 		Type: field.Type,
 	}
+	if field.DocList != nil && len(field.DocList) > 0 {
+		tf.Doc = strings.ReplaceAll(field.DocList[0].Text, "\n", " ")
+		tf.Doc = strings.Replace(tf.Doc, "//", "", 1)
+	}
 	tags := make([]string, 0)
 	decoder, ok := field.Tag.Lookup(tagKey)
 	if ok {
 		tags = append(tags, fmt.Sprintf(`%s:"%s"`, encodeKey, decoder))
+		tf.Alias = decoder
+	} else {
+		tf.Alias = field.Name
 	}
 	column, ok := field.Tag.Lookup("column")
 	if ok {

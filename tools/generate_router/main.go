@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -22,6 +21,8 @@ import (
 var (
 	typeName   = flag.String("type", "", "type name; must be set")
 	method     = flag.String("method", "Find", "Create, Update, Find, First")
+	apiPath    = flag.String("apiPath", "/", "API annotation for document")
+	docDir     = flag.String("docDir", "../doc/", "Document prefix dir")
 	required   = flag.String("require", "", "input required fields, default read gorm tag in struct which is not null without primaryKey and default")
 	minItem    = flag.Uint("minItem", 1, "minimum number of items to choose")
 	options    = flag.String("options", "", "input options fields")
@@ -31,8 +32,6 @@ var (
 	max_limit  = flag.Uint("max_limit", 20, "search limit")
 	min_limit  = flag.Uint("min_limit", 0, "min_limit")
 )
-
-const DocFile string = "doc.json"
 
 func isDir(name string) bool {
 	info, err := os.Stat(name)
@@ -69,7 +68,7 @@ func main() {
 	if *typeName == "" {
 		fmt.Fprintf(os.Stderr, "type required\n")
 		flag.PrintDefaults()
-		return
+		os.Exit(127)
 	}
 	if !NewCommaSet("Create,Update,Find,First").CheckAndDelete(*method) {
 		log.Fatal("method must either Create, Update, Find or First, but got ", *method)
@@ -85,15 +84,11 @@ func main() {
 		rootDir = filepath.Dir(args[0])
 	}
 
-	_, err := os.Stat(path.Join(rootDir, DocFile))
-	if os.IsNotExist(err) {
-		ioutil.WriteFile(path.Join(rootDir, DocFile), []byte("{}\n"), 0642)
-	}
 	requireSet := NewCommaSet(*required)
 	optionsSet := NewCommaSet(*options)
 	ignoreSet := NewCommaSet(*ignore)
 
-	parsedPKG := parsePackage([]string{*typeName})
+	parsedPKG := parsePackage(*typeName)
 	parsedTypes := parsedPKG.StructList
 	if len(parsedTypes) == 0 {
 		log.Fatal("can't find type ", *typeName)
@@ -107,10 +102,13 @@ func main() {
 			strings.ToLower(*method),
 		))
 	os.Remove(filename)
-	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0644)
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		log.Fatal("open file error ", err)
 	}
+
+	var parsedInformation interface{}
+	var docFileName string
 	if *method == "Create" {
 		temp := MethodCreate(MethodCreateParams{
 			ParsedType: parsedTypes[0],
@@ -118,12 +116,13 @@ func main() {
 			OptionsSet: optionsSet,
 			IgnoreSet:  ignoreSet,
 			TagKey:     *decoder,
-			MinItem:    *minItem,
 		})
 		temp.Package = parsedPKG.Name
 		t := template.New("").Funcs(funcMap)
 		t = template.Must(t.Parse(CreateOrUpdateTemplate))
 		t.Execute(file, temp)
+		parsedInformation = temp
+		docFileName = path.Join(*docDir, *method+temp.StructName+".go")
 	} else if *method == "Update" {
 		temp := MethodUpdate(MethodUpdateParams{
 			ParsedType: parsedTypes[0],
@@ -132,12 +131,13 @@ func main() {
 			IgnoreSet:  ignoreSet,
 			IndexField: *indexField,
 			TagKey:     *decoder,
-			MinItem:    *minItem,
 		})
 		temp.Package = parsedPKG.Name
 		t := template.New("").Funcs(funcMap)
 		t = template.Must(t.Parse(CreateOrUpdateTemplate))
 		t.Execute(file, temp)
+		parsedInformation = temp
+		docFileName = path.Join(*docDir, *method+temp.StructName+".go")
 	} else if *method == "First" {
 		temp := MethodSearch(MethodSearchParams{
 			ParsedType: parsedTypes[0],
@@ -150,6 +150,8 @@ func main() {
 		t := template.New("").Funcs(funcMap)
 		t = template.Must(t.Parse(FirstTemplate))
 		t.Execute(file, temp)
+		parsedInformation = temp
+		docFileName = path.Join(*docDir, *method+temp.StructName+".go")
 	} else if *method == "Find" {
 		temp := MethodSearch(MethodSearchParams{
 			ParsedType: parsedTypes[0],
@@ -162,18 +164,22 @@ func main() {
 		t := template.New("").Funcs(funcMap)
 		t = template.Must(t.Parse(FindTemplate))
 		t.Execute(file, temp)
+		parsedInformation = temp
+		docFileName = path.Join(*docDir, *method+temp.StructName+".go")
 	} else {
 		log.Fatal("method not support now :<")
 	}
 	file.Close()
 	cmd := exec.Command("go", "fmt")
+
 	if err := cmd.Run(); err != nil {
-		fmt.Println("can't find gofmt to format the code")
+		fmt.Printf("go fmt code got error %s\n", err)
 	}
 	cmd = exec.Command("gopls", "imports", "-w", filename)
 	if err := cmd.Run(); err != nil {
 		fmt.Println("can't find gopls to import the code")
 	}
+
 	for key := range *requireSet {
 		if key == "" {
 			continue
@@ -185,6 +191,20 @@ func main() {
 			continue
 		}
 		fmt.Printf("warning: options field %s is not used\n", key)
+	}
+
+	// generate golang document files
+	if _, err := os.Stat(*docDir); os.IsNotExist(err) {
+		os.MkdirAll(*docDir, 0755)
+	}
+
+	file, err = os.OpenFile(docFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		log.Fatalf("open document file %s error, error is %s\n", docFileName, err)
+	}
+	err = GenerateDocument(*method, parsedInformation, file)
+	if err != nil {
+		fmt.Println(err)
 	}
 }
 
@@ -203,7 +223,7 @@ type Field struct {
 	Name     string
 	RawField ast.Expr
 	Tag      reflect.StructTag
-	Doc      *ast.CommentGroup
+	DocList  []*ast.Comment
 	Type     string
 }
 
@@ -230,7 +250,7 @@ func getExprName(expr ast.Expr) string {
 	return typeStr
 }
 
-func parsePackage(structname []string) *Package {
+func parsePackage(structname string) *Package {
 	pkgs, err := packages.Load(&packages.Config{
 		Mode:  packages.LoadSyntax,
 		Tests: false,
@@ -239,31 +259,24 @@ func parsePackage(structname []string) *Package {
 		log.Fatal(err)
 	}
 	pkg := pkgs[0]
-	result := make([]Type, 0)
+	result := Package{
+		Name:       pkg.Name,
+		StructList: make([]Type, 0),
+	}
 	for _, file := range pkg.Syntax {
 		ast.Inspect(file, func(node ast.Node) bool {
 			decl, ok := node.(*ast.GenDecl)
 			if !ok || decl.Tok != token.TYPE {
 				return true
 			}
+			keepSearching := true
 			for _, spec := range decl.Specs {
 				vspec := spec.(*ast.TypeSpec)
 				structType, ok := vspec.Type.(*ast.StructType)
-				if !ok {
+				if !ok || structname != vspec.Name.Name {
 					continue
 				}
-				if structname != nil {
-					con := false
-					for _, val := range structname {
-						if val == vspec.Name.Name {
-							con = true
-							break
-						}
-					}
-					if !con {
-						continue
-					}
-				}
+				keepSearching = false
 				t := Type{
 					Name:   vspec.Name.Name,
 					Fields: make([]Field, 0),
@@ -276,22 +289,23 @@ func parsePackage(structname []string) *Package {
 
 					typeStr := getExprName(field.Type)
 					for _, name := range field.Names {
+						var DocList []*ast.Comment
+						if field.Doc != nil {
+							DocList = field.Doc.List
+						}
 						t.Fields = append(t.Fields, Field{
 							Name:     name.Name,
 							RawField: field.Type,
+							DocList:  DocList,
 							Tag:      tags,
-							Doc:      field.Doc,
 							Type:     typeStr,
 						})
 					}
 				}
-				result = append(result, t)
+				result.StructList = append(result.StructList, t)
 			}
-			return true
+			return keepSearching
 		})
 	}
-	return &Package{
-		Name:       pkg.Name,
-		StructList: result,
-	}
+	return &result
 }

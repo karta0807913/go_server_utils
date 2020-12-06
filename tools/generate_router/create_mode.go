@@ -13,23 +13,24 @@ type MethodCreateParams struct {
 	OptionsSet *CommaSet
 	IgnoreSet  *CommaSet
 	TagKey     string
-	MinItem    uint
 }
 
 // Create *TemplateRoot and update *Document
-func MethodCreate(arg MethodCreateParams) *TemplateRoot {
-	templateRoot := TemplateRoot{
-		FuncName:       *method,
-		StructName:     arg.ParsedType.Name,
-		Decoder:        "ShouldBind" + strings.ToUpper(arg.TagKey),
-		RequiredFields: make([]TemplateField, 0),
-		OptionalFields: make([]TemplateField, 0),
-		Mode:           "Create",
-		MinItem:        arg.MinItem,
+func MethodCreate(arg MethodCreateParams) *CreateAndUpdateTemplateRoot {
+	templateRoot := CreateAndUpdateTemplateRoot{
+		TemplateRoot: TemplateRoot{
+			FuncName:       *method,
+			StructName:     arg.ParsedType.Name,
+			Decoder:        "ShouldBind" + strings.ToUpper(arg.TagKey),
+			RequiredFields: make([]TemplateField, 0),
+			OptionalFields: make([]TemplateField, 0),
+			Mode:           "Create",
+		},
+		MinItem: *minItem,
 	}
 
 	for _, field := range arg.ParsedType.Fields {
-		tf, tags, join := parseFields(templateRoot, field, arg.TagKey, arg.TagKey)
+		tf, tags, join := parseFields(templateRoot.TemplateRoot, field, arg.TagKey, arg.TagKey)
 		// if this field is required
 		if arg.IgnoreSet.CheckAndDelete(field.Name) {
 			continue
