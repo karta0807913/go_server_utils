@@ -15,13 +15,13 @@ var ` + method + `{{ .StructName }} Document = Document{
     Comment: "",
 	Mode: "{{ .Mode }}",
     Fields: []Field{
-        {{ with .IndexField }}{
+        {{ if or (eq .Mode "Create") (eq .Mode "Update") }}{{ with .IndexField }}{
             Required: true,
             Comment: "{{ .Doc }}",
             Name: "{{ .Name }}",
             Alias: "{{ .Alias }}",
             Type: "{{ .Type }}",
-        },{{ end }}{{ range .RequiredFields }}{
+        },{{ end }}{{ end }}{{ range .RequiredFields }}{
             Required: true,
             Comment: "{{ .Doc }}",
             Name: "{{ .Name }}",
