@@ -11,7 +11,7 @@ Generated binary can be used for generate document.
 
 target struct
 
-```
+```golang
 type Borrower struct {
     // user id
 	ID uint `gorm:"primaryKey" json:"id"`
@@ -44,7 +44,7 @@ source file `doc/README.md`
 
 run command `./doc/doc ./doc/README.md README.md`
 
-output file
+output file `README.md`
 
 ```
 ### GET `/api/borrower`

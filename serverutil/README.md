@@ -1,5 +1,10 @@
 # A simple gin server with jwt session
 
+Install command
+
+```
+go get https://github.com/karta0807913/go_server_utils/serverutil
+```
 
 ## func NewGinServer
 
@@ -95,7 +100,7 @@ func (self *GinSessionFactory) SessionMiddleware(sessionName string) gin.Handler
 
 # Example
 
-```
+```golang
 package main
 
 import (

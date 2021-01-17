@@ -1,5 +1,10 @@
 # A simple CRUD generator
 
+Install command
+
+```
+go get https://github.com/karta0807913/go_server_utils/tools/generate_router
+```
 
 ## Module requirement
 
@@ -145,7 +150,7 @@ generate_router -type "Borrower" -method "Find" -ignore "ID"
 
 * borrow_find.go
 
-```goland
+```golang
 package model
 
 import (
@@ -226,7 +231,7 @@ generate_router -type "Borrower" -method "Update"
 
 * borrow_update.go
 
-```goland
+```golang
 package model
 
 import (
