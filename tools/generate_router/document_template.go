@@ -15,7 +15,7 @@ var ` + method + `{{ .StructName }} Document = Document{
     Comment: "",
 	Mode: "{{ .Mode }}",
     Fields: []Field{
-        {{ if or (eq .Mode "Create") (eq .Mode "Update") }}{{ with .IndexField }}{
+        {{ if or (eq .Mode "Create") (eq .Mode "Updates") }}{{ with .IndexField }}{
             Required: true,
             Comment: "{{ .Doc }}",
             Name: "{{ .Name }}",
