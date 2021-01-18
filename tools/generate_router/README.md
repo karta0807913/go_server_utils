@@ -3,7 +3,7 @@
 Install command
 
 ```
-go get https://github.com/karta0807913/go_server_utils/tools/generate_router
+go get github.com/karta0807913/go_server_utils/tools/generate_router
 ```
 
 ## Module requirement
