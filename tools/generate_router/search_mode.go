@@ -10,6 +10,7 @@ type MethodSearchParams struct {
 	RequireSet *CommaSet
 	OptionsSet *CommaSet
 	IgnoreSet  *CommaSet
+	DefaultSet *CommaSet
 	TagKey     string
 }
 
@@ -22,6 +23,7 @@ func MethodSearch(arg MethodSearchParams) *SearchTemplateRoot {
 			Decoder:        "ShouldBindQuery",
 			RequiredFields: make([]TemplateField, 0),
 			OptionalFields: make([]TemplateField, 0),
+			DefaultFields:  make([]TemplateField, 0),
 			Mode:           "Search",
 		},
 	}
@@ -51,6 +53,9 @@ func MethodSearch(arg MethodSearchParams) *SearchTemplateRoot {
 		} else if arg.OptionsSet.CheckAndDelete(field.Name) {
 			tf.Tag = "`" + strings.Join(tags, " ") + "`"
 			templateRoot.OptionalFields = append(templateRoot.OptionalFields, tf)
+		} else if arg.DefaultSet.CheckAndDelete(field.Name) {
+			tf.Tag = "`" + strings.Join(tags, " ") + "`"
+			templateRoot.DefaultFields = append(templateRoot.DefaultFields, tf)
 		} else {
 			if flag < 4 {
 				continue

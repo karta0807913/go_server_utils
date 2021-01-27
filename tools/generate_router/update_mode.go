@@ -10,6 +10,7 @@ type MethodUpdateParams struct {
 	RequireSet *CommaSet
 	OptionsSet *CommaSet
 	IgnoreSet  *CommaSet
+	DefaultSet *CommaSet
 	IndexField string
 	TagKey     string
 }
@@ -22,6 +23,7 @@ func MethodUpdate(arg MethodUpdateParams) *CreateAndUpdateTemplateRoot {
 			Decoder:        "ShouldBind" + strings.ToUpper(arg.TagKey),
 			RequiredFields: make([]TemplateField, 0),
 			OptionalFields: make([]TemplateField, 0),
+			DefaultFields:  make([]TemplateField, 0),
 			Mode:           "Updates",
 		},
 		MinItem: *minItem,
@@ -51,6 +53,9 @@ func MethodUpdate(arg MethodUpdateParams) *CreateAndUpdateTemplateRoot {
 		} else if arg.OptionsSet.CheckAndDelete(field.Name) {
 			tf.Tag = "`" + strings.Join(tags, " ") + "`"
 			templateRoot.OptionalFields = append(templateRoot.OptionalFields, tf)
+		} else if arg.DefaultSet.CheckAndDelete(field.Name) {
+			tf.Tag = "`" + strings.Join(tags, " ") + "`"
+			templateRoot.DefaultFields = append(templateRoot.DefaultFields, tf)
 		} else if flag > indexFlag {
 			if templateRoot.IndexField != nil {
 				templateRoot.IndexField.Tag = "`" + strings.Join(indexTags, " ") + "`"

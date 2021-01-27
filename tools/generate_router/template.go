@@ -32,6 +32,7 @@ func (insert *{{ .StructName }}){{ .FuncName }}(c *gin.Context, db *gorm.DB) err
     {{ if ne (len .RequiredFields) 0 }}
       selectField := []string {
         {{ range .RequiredFields }}"{{ .Column }}",
+        {{ end }}{{ range .DefaultFields }}"{{ .Column }}",
         {{ end }}
       }
     {{ else }}
@@ -49,7 +50,7 @@ func (insert *{{ .StructName }}){{ .FuncName }}(c *gin.Context, db *gorm.DB) err
     {{/* check options */}}
     {{ if ne .MinItem 0 }}
       {{ if ne (len .OptionalFields) 0}}
-        if len(selectField) == {{ len .RequiredFields }} {
+        if len(selectField) == ({{ len .RequiredFields }} + {{ len .DefaultFields }} + {{ .MinItem }}) {
           return errors.New("require at least one option")
         }
       {{ end }}
@@ -90,10 +91,12 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
     {{ if ne (len .RequiredFields) 0}}
       whereField := []string {
         {{ range .RequiredFields }}"{{ $TableName }}.{{ .Column }}=?",
+        {{ end }}{{ range .DefaultFields }}"{{ $TableName }}{{ .Column }}",
         {{ end }}
       }
       valueField := []interface{}{
         {{ range .RequiredFields }}body.{{ .Name }},
+        {{ end }}{{ range .DefaultFields }}{{ .StructName }}.{{ .Name }},
         {{ end }}
       }
       {{ range .RequiredFields }}
@@ -149,10 +152,12 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) ([]{
     {{ if ne (len .RequiredFields) 0}}
       whereField := []string {
         {{ range .RequiredFields }}"{{ $TableName }}.{{ .Column }}=?",
+        {{ end }}{{ range .DefaultFields }}"{{ $TableName }}.{{ .Column }}=?",
         {{ end }}
       }
       valueField := []interface{}{
         {{ range .RequiredFields }}body.{{ .Name }},
+        {{ end }}{{ range .DefaultFields }}{{ .StructName }}.{{ .Name }},
         {{ end }}
       }
       {{ range .RequiredFields }}
@@ -216,6 +221,7 @@ type TemplateRoot struct {
 	Mode           string
 	RequiredFields []TemplateField
 	OptionalFields []TemplateField
+	DefaultFields  []TemplateField
 }
 
 type SearchTemplateRoot struct {

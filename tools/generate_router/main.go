@@ -24,10 +24,11 @@ var (
 	apiPath    = flag.String("apiPath", "/", "API annotation for document")
 	docDir     = flag.String("docDir", "../doc/", "Document prefix dir")
 	required   = flag.String("require", "", "input required fields, default read gorm tag in struct which is not null without primaryKey and default")
-	minItem    = flag.Uint("minItem", 1, "minimum number of items to choose")
 	options    = flag.String("options", "", "input options fields")
-	decoder    = flag.String("decoder", "json", "decoder: xml,json or etc")
 	ignore     = flag.String("ignore", "", "which field should ignore")
+	useDefault = flag.String("useDefault", "", "these fields will read from structure")
+	minItem    = flag.Uint("minItem", 1, "minimum number of items to choose")
+	decoder    = flag.String("decoder", "json", "decoder: xml,json or etc")
 	indexField = flag.String("indexField", "", "for an update index")
 	max_limit  = flag.Uint("max_limit", 20, "search limit")
 	min_limit  = flag.Uint("min_limit", 0, "min_limit")
@@ -87,6 +88,7 @@ func main() {
 	requireSet := NewCommaSet(*required)
 	optionsSet := NewCommaSet(*options)
 	ignoreSet := NewCommaSet(*ignore)
+	defaultSet := NewCommaSet(*useDefault)
 
 	parsedPKG := parsePackage(*typeName)
 	parsedTypes := parsedPKG.StructList
@@ -115,6 +117,7 @@ func main() {
 			RequireSet: requireSet,
 			OptionsSet: optionsSet,
 			IgnoreSet:  ignoreSet,
+			DefaultSet: defaultSet,
 			TagKey:     *decoder,
 		})
 		temp.Package = parsedPKG.Name
@@ -129,6 +132,7 @@ func main() {
 			RequireSet: requireSet,
 			OptionsSet: optionsSet,
 			IgnoreSet:  ignoreSet,
+			DefaultSet: defaultSet,
 			IndexField: *indexField,
 			TagKey:     *decoder,
 		})
@@ -143,6 +147,7 @@ func main() {
 			ParsedType: parsedTypes[0],
 			RequireSet: requireSet,
 			OptionsSet: optionsSet,
+			DefaultSet: defaultSet,
 			IgnoreSet:  ignoreSet,
 			TagKey:     *decoder,
 		})
@@ -157,6 +162,7 @@ func main() {
 			ParsedType: parsedTypes[0],
 			RequireSet: requireSet,
 			OptionsSet: optionsSet,
+			DefaultSet: defaultSet,
 			IgnoreSet:  ignoreSet,
 			TagKey:     *decoder,
 		})
@@ -184,13 +190,19 @@ func main() {
 		if key == "" {
 			continue
 		}
-		fmt.Printf("warning: require field %s is not used\n", key)
+		fmt.Printf("warning: require field %s not used\n", key)
 	}
 	for key := range *optionsSet {
 		if key == "" {
 			continue
 		}
-		fmt.Printf("warning: options field %s is not used\n", key)
+		fmt.Printf("warning: options field %s not used\n", key)
+	}
+	for key := range *defaultSet {
+		if key == "" {
+			continue
+		}
+		fmt.Printf("warning: default field %s not used\n", key)
 	}
 
 	// generate golang document files
