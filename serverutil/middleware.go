@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-
-	cuserr "github.com/karta0807913/lab_server/error"
 )
 
 type MiddlewareInterface interface {
@@ -17,6 +15,19 @@ type MiddlewareInterface interface {
 type Middleware struct {
 	MiddlewareInterface
 	err_msg string
+}
+
+type JSONBodyError struct {
+	error
+}
+
+type FieldMissingError struct {
+	error
+	errorText string
+}
+
+func (self *FieldMissingError) Error() string {
+	return self.errorText
 }
 
 func (self Middleware) Handle(req *http.Request, body interface{}) error {
@@ -52,7 +63,7 @@ func (self JsonBodyParser) Handle(req *http.Request, body interface{}) error {
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(body); err != nil {
-		return new(cuserr.IsNotJsonError)
+		return new(JSONBodyError)
 	}
 	return nil
 }
@@ -63,8 +74,8 @@ func (self BodyCheck) Handle(req *http.Request, body interface{}) error {
 	for i := 0; i < v.NumField(); i++ {
 		if v.Field(i).IsNil() {
 			t := v.Type()
-			return &cuserr.UserInputError{
-				ErrMsg: fmt.Sprintf("key %s missing", t.Field(i).Name),
+			return &FieldMissingError{
+				errorText: fmt.Sprintf("key %s missing", t.Field(i).Name),
 			}
 		}
 	}
