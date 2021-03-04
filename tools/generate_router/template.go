@@ -117,7 +117,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
     {{ end }}
 
     {{ if eq (len .RequiredFields) 0}}
-      if len(valueField) < ({{ len .RequiredFields }} + {{ len .DefaultFields }} + {{ .MinItem }}) {
+      if len(valueField) < ({{ len .RequiredFields }} + {{ len .DefaultFields }} + 1) {
         return errors.New("require option")
       }
     {{ end }}
