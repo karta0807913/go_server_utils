@@ -29,7 +29,7 @@ func (insert *{{ .StructName }}){{ .FuncName }}(c *gin.Context, db *gorm.DB) err
     {{ with .IndexField }}insert.{{ .Name }} = body.{{ .Name }}{{ end }}
 
     {{/* select array */}}
-    {{ if ne (len .RequiredFields) 0 }}
+    {{ if or (ne (len .RequiredFields) 0) (ne (len .DefaultFields) 0)}}
       selectField := []string {
         {{ range .RequiredFields }}"{{ .Column }}",
         {{ end }}{{ range .DefaultFields }}"{{ .Column }}",
@@ -50,7 +50,7 @@ func (insert *{{ .StructName }}){{ .FuncName }}(c *gin.Context, db *gorm.DB) err
     {{/* check options */}}
     {{ if ne .MinItem 0 }}
       {{ if ne (len .OptionalFields) 0}}
-        if len(selectField) == ({{ len .RequiredFields }} + {{ len .DefaultFields }} + {{ .MinItem }}) {
+        if len(selectField) < ({{ len .RequiredFields }} + {{ len .DefaultFields }} + {{ .MinItem }}) {
           return errors.New("require at least one option")
         }
       {{ end }}
@@ -88,7 +88,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
         return err
     }
     {{/* if decode success, search the specific data */}}
-    {{ if ne (len .RequiredFields) 0}}
+    {{ if or (ne (len .RequiredFields) 0) (ne (len .DefaultFields) 0)}}
       whereField := []string {
         {{ range .RequiredFields }}"{{ $TableName }}.{{ .Column }}=?",
         {{ end }}{{ range .DefaultFields }}"{{ $TableName }}{{ .Column }}",
@@ -96,7 +96,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
       }
       valueField := []interface{}{
         {{ range .RequiredFields }}body.{{ .Name }},
-        {{ end }}{{ range .DefaultFields }}{{ .StructName }}.{{ .Name }},
+        {{ end }}{{ range .DefaultFields }}item.{{ .Name }},
         {{ end }}
       }
       {{ range .RequiredFields }}
@@ -117,8 +117,8 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) erro
     {{ end }}
 
     {{ if eq (len .RequiredFields) 0}}
-      if len(valueField) == 0 {
-        return errors.New("require at least one option")
+      if len(valueField) < ({{ len .RequiredFields }} + {{ len .DefaultFields }} + {{ .MinItem }}) {
+        return errors.New("require option")
       }
     {{ end }}
 
@@ -149,7 +149,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) ([]{
     _ = c.{{ .Decoder }}(&body)
 
     {{/* if decode success, search the specific data */}}
-    {{ if ne (len .RequiredFields) 0}}
+    {{ if or (ne (len .RequiredFields) 0) (ne (len .DefaultFields) 0)}}
       whereField := []string {
         {{ range .RequiredFields }}"{{ $TableName }}.{{ .Column }}=?",
         {{ end }}{{ range .DefaultFields }}"{{ $TableName }}.{{ .Column }}=?",
@@ -157,7 +157,7 @@ func (item *{{ .StructName }}) {{ .FuncName }}(c *gin.Context, db *gorm.DB) ([]{
       }
       valueField := []interface{}{
         {{ range .RequiredFields }}body.{{ .Name }},
-        {{ end }}{{ range .DefaultFields }}{{ .StructName }}.{{ .Name }},
+        {{ end }}{{ range .DefaultFields }}item.{{ .Name }},
         {{ end }}
       }
       {{ range .RequiredFields }}
