@@ -6,7 +6,8 @@
 
 ## usage
 
-run `doc_generate` in generate_router generated document folder then build it.
+run `doc_generate` in generate_router generated document (`default: <project_root>/doc`) folder then build it.
+
 Generated binary can be used for generate document.
 
 target struct
